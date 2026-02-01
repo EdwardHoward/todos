@@ -23,6 +23,7 @@ defmodule TodosWeb.Live.TodoLive.Index do
       ) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Todos.PubSub, "todos")
+      Phoenix.PubSub.subscribe(Todos.PubSub, "achievements:#{user_id}")
     end
 
     query =
@@ -49,6 +50,12 @@ defmodule TodosWeb.Live.TodoLive.Index do
     todos = Repo.all(query)
 
     {:noreply, assign(socket, todos: todos)}
+  end
+
+  def handle_info({:achievement_unlocked, event}, socket) do
+    {:noreply,
+     socket
+     |> put_flash(:info, "🎉 Achievement Unlocked: #{event.title}! #{event.description}")}
   end
 
   def handle_event(

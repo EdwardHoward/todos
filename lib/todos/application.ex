@@ -11,7 +11,9 @@ defmodule Todos.Application do
       TodosWeb.Telemetry,
       Todos.Repo,
       Todos.CommandedApp,
+      Todos.ProcessManagers.AchievementManager,
       Todos.Projectors.TodoProjector,
+      Todos.Projectors.AchievementProjector,
       {DNSCluster, query: Application.get_env(:todos, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Todos.PubSub},
       # Start a worker by calling: Todos.Worker.start_link(arg)

@@ -97,6 +97,94 @@ When adding a new command/event flow:
 - `lib/todos_web/live/todo_live/index.ex` - Main LiveView
 - `config/dev.exs` - EventStore & Repo database configs
 
+## Process Manager Patterns
+
+Process managers coordinate long-running business processes across multiple aggregates. They listen to events and dispatch commands to orchestrate sagas.
+
+### Event Routing with `interested?/1`
+
+The `interested?/1` callback determines which events this process manager handles:
+
+- `{:start!, instance_uuid}` - Start new process manager instance
+- `{:continue!, instance_uuid}` - Route to existing instance
+- `{:stop, instance_uuid}` - Stop instance after handling event
+- `false` - Ignore this event
+
+```elixir
+def interested?(%TodoCompleted{user_id: user_id}), do: {:start!, user_id}
+def interested?(%AchievementUnlocked{user_id: user_id}), do: {:continue!, user_id}
+def interested?(_event), do: false
+```
+
+### State Management with `handle/2`
+
+The `handle/2` callback processes events and optionally dispatches commands:
+
+**Return Values:**
+- `commands` - Single command or list of commands to dispatch
+- `{commands, new_state}` - Commands with explicit state update
+- `new_state` - Only update state, no commands
+- **NEVER** return `{[], new_state}` - Empty list causes "unregistered command" error
+
+```elixir
+# Pattern 1: Dispatch commands with state update
+def handle(%__MODULE__{} = state, %TodoCompleted{}) do
+  new_state = %{state | completed_count: state.completed_count + 1}
+  
+  case check_achievements(new_state) do
+    [] -> new_state  # No commands, return state only
+    commands -> {commands, new_state}  # Return commands with state
+  end
+end
+
+# Pattern 2: Only update state (no commands)
+def handle(%__MODULE__{} = state, %AchievementUnlocked{achievement_type: type}) do
+  %{state | unlocked: [type | state.unlocked]}
+end
+```
+
+### State Updates with `apply/2`
+
+The `apply/2` callback updates process manager state from events. If omitted, state doesn't change:
+
+```elixir
+def apply(%__MODULE__{} = state, %TodoCompleted{}) do
+  %{state | completed_count: state.completed_count + 1}
+end
+```
+
+### Error Handling with `error/3`
+
+The `error/3` callback handles command dispatch failures:
+
+- `:retry` - Retry immediately with same context
+- `{:retry, delay_ms, context}` - Retry after delay with updated context
+- `{:stop, reason}` - Stop process manager (will restart if supervised)
+- `:skip` - Ignore error and continue
+
+```elixir
+def error({:error, :validation_failed}, _failed_command, _failure_context) do
+  :skip  # Skip validation errors, continue process
+end
+
+def error({:error, :timeout}, failed_command, %{attempts: attempts} = context) when attempts < 3 do
+  {:retry, 1000, %{context | attempts: attempts + 1}}
+end
+
+def error(error, _command, _context) do
+  {:stop, error}  # Stop on unknown errors
+end
+```
+
+**Critical:** Default error handling returns `:stop`, which can cause restart loops if supervisor strategy is `:restart`. Consider implementing custom error/3 for production.
+
+### Common Pitfalls
+
+1. **Empty Command Lists**: Never return `{[], state}` from `handle/2`. Return `state` instead.
+2. **Missing interested?/1**: All events return `false` by default. Must explicitly route.
+3. **Restart Loops**: Default `:stop` on errors + supervisor `:restart` = infinite loop.
+4. **State Mutations**: Use `apply/2` for event-driven state changes, `handle/2` for command-driven logic.
+
 ## Testing Event Sourced Features
 
 When testing command/event flows, verify:
