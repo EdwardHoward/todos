@@ -16,35 +16,30 @@ defmodule Todos.ProcessManagers.AchievementManager do
   def interested?(_event), do: false
 
   # Update state from events (event-driven state changes - called first)
-  def apply(%__MODULE__{user_id: nil} = state, %TodoCompleted{user_id: user_id}) do
-    %{state | user_id: user_id, completed_count: 1}
-  end
-
-  def apply(%__MODULE__{completed_count: count} = state, %TodoCompleted{}) do
-    %{state | completed_count: count + 1}
+  def apply(%__MODULE__{} = state, %TodoCompleted{user_id: user_id}) do
+    %{state |
+      user_id: state.user_id || user_id,
+      completed_count: state.completed_count + 1
+    }
   end
 
   def apply(%__MODULE__{unlocked: unlocked} = state, %AchievementUnlocked{achievement_type: type}) do
     %{state | unlocked: [type | unlocked]}
   end
 
-  # Dispatch commands based on updated state (called after apply/2)
+  # Dispatch commands based on current state (called before apply/2)
   def handle(
         %__MODULE__{
           user_id: user_id,
           completed_count: count,
           unlocked: unlocked
         },
-        %TodoCompleted{}
+        %TodoCompleted{user_id: event_user_id}
       ) do
-    commands = check_achievements(user_id, count, unlocked)
+    new_count = count + 1
+    actual_user_id = user_id || event_user_id
 
-    case commands do
-      # Return empty list when no commands
-      [] -> []
-      # Return commands list
-      _ -> commands
-    end
+    check_achievements(actual_user_id, new_count, unlocked)
   end
 
   # Handle command dispatch errors
@@ -52,7 +47,7 @@ defmodule Todos.ProcessManagers.AchievementManager do
     # Achievement already exists, continue processing
     :skip
   end
-  
+
   def error(error, _command, _context) do
     # Stop on unknown errors
     {:stop, error}

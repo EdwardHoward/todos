@@ -23,6 +23,7 @@ defmodule TodosWeb.Router do
     live_session :todos,
       on_mount: [{TodosWeb.UserAuth, :require_authenticated}] do
       live("/", Live.TodoLive.Index, :todos_index)
+      live("/achievements", Live.AchievementLive.List, :achievements_list)
     end
   end
 
