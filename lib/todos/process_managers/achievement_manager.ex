@@ -10,12 +10,10 @@ defmodule Todos.ProcessManagers.AchievementManager do
   alias Todos.Events.{TodoCompleted, AchievementUnlocked}
   alias Todos.Commands.UnlockAchievement
 
-  # Route events to process manager instance by user_id
   def interested?(%TodoCompleted{user_id: user_id}), do: {:start, user_id}
   def interested?(%AchievementUnlocked{user_id: user_id}), do: {:continue!, user_id}
   def interested?(_event), do: false
 
-  # Update state from events (event-driven state changes - called first)
   def apply(%__MODULE__{} = state, %TodoCompleted{user_id: user_id}) do
     %{state |
       user_id: state.user_id || user_id,
@@ -27,7 +25,6 @@ defmodule Todos.ProcessManagers.AchievementManager do
     %{state | unlocked: [type | unlocked]}
   end
 
-  # Dispatch commands based on current state (called before apply/2)
   def handle(
         %__MODULE__{
           user_id: user_id,
@@ -53,7 +50,6 @@ defmodule Todos.ProcessManagers.AchievementManager do
     {:stop, error}
   end
 
-  # Generate achievement unlock commands based on milestones
   defp check_achievements(user_id, count, already_unlocked) do
     [
       {5, "first_five", "Getting Started", "Complete 5 todos"},

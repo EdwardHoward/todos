@@ -3,8 +3,6 @@ import Dotenvy
 
 project_root = File.cwd!()
 
-IO.inspect(Path.join(project_root, "/.env"))
-
 source!([
   Path.join(project_root, "/.env"),
   Path.join(project_root, ".#{config_env()}.env"),
@@ -34,11 +32,6 @@ end
 
 config :todos, TodosWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
-
-config :todos, :modern_treasury,
-  org_id: env!("MODERN_TREASURY_ORG_ID", :string!),
-  api_key: env!("MODERN_TREASURY_API_KEY", :string!),
-  base_url: env!("MODERN_TREASURY_BASE_URL", :string, "https://app.moderntreasury.com")
 
 if config_env() == :prod do
   database_url =
